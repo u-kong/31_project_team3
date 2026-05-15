@@ -1,0 +1,43 @@
+{
+  "scan_info": {
+    "scan_date": "2026-05-15",
+    "target": "모의 인터넷뱅킹 사이트",
+    "target_url": "http://localhost:3000",
+    "scanner": "공격팀"
+  },
+  "vulnerabilities": [
+    {
+      "id": "VULN-001",
+      "name": "SQL Injection (SQL 인젝션)",
+      "severity": "HIGH",
+      "endpoint": "/api/login",
+      "method": "POST",
+      "attack_method": "POST 파라미터에 악의적인 SQL 구문 삽입",
+      "payload": "' OR '1'='1' --",
+      "result": "인증 우회 성공 - 관리자 계정으로 로그인됨",
+      "evidence": "서버 응답 200 OK, 세션 토큰 발급 확인"
+    },
+    {
+      "id": "VULN-002",
+      "name": "XSS (Cross-Site Scripting, 크로스사이트 스크립팅)",
+      "severity": "MEDIUM",
+      "endpoint": "/board/write",
+      "method": "POST",
+      "attack_method": "게시판 입력 필드에 스크립트 코드 삽입",
+      "payload": "<script>alert(document.cookie)</script>",
+      "result": "쿠키 정보 탈취 가능",
+      "evidence": "게시글 조회 시 팝업 실행 확인"
+    },
+    {
+      "id": "VULN-003",
+      "name": "IDOR (Insecure Direct Object Reference, 안전하지 않은 직접 객체 참조)",
+      "severity": "HIGH",
+      "endpoint": "/api/account/{account_id}",
+      "method": "GET",
+      "attack_method": "URL의 account_id 값을 타 사용자 ID로 변조",
+      "payload": "account_id=10001 → account_id=10002",
+      "result": "타 사용자 계좌 정보 열람 성공",
+      "evidence": "다른 사용자의 잔액, 거래내역 응답 수신"
+    }
+  ]
+}

