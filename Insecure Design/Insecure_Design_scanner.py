@@ -90,7 +90,7 @@ def check_second_password(response_text):
 
         if keyword.lower() in response_text.lower():
 
-            result["SeSecondPassword"] = "[SAFE] 추가 인증 존재"
+            result["SecondPassword"] = "[SAFE] 추가 인증 존재"
 
             return
 
@@ -98,7 +98,7 @@ def check_second_password(response_text):
 
 
 # 메인 실행
-def main():
+def Insecure():
     block = False
     for i in range(0, 5) :
         response_login = login(wrong_account)
@@ -124,6 +124,4 @@ def main():
 
 
 
-if __name__ == "__main__":
-    main()
 
