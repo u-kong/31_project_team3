@@ -31,7 +31,8 @@ export const transferAPI = {
 export const exchangeAPI = {
   allRates:  ()    => api.get('/exchange/rates'),
   rate:      (cur) => api.get(`/exchange/rate?currency=${cur}`),
-  ssrfFetch: (url) => api.get(`/exchange/rate?url=${encodeURIComponent(url)}`), // SSRF
+  liveRates: ()    => api.get('/exchange/rates/live'),
+  ssrfFetch: (url) => api.get(`/exchange/rate?url=${encodeURIComponent(url)}`),
 };
 
 export const adminAPI = {
