@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 from urllib.parse import urljoin
-
+from datetime import datetime
 import requests
 
 
@@ -314,6 +314,38 @@ def main():
         print(json.dumps(error_result, ensure_ascii=False, indent=2))
         sys.exit(2)
 
+
+def bfla_check(base_url):
+    result_raw = run_bfla_check(
+        base_url=base_url,
+        username="alice",
+        password="alice1234",
+        endpoints=DEFAULT_ENDPOINTS,
+        timeout=5
+    )
+
+    result = {
+        "scan_id": "BFLA",
+        "target": base_url,
+        "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "vulnerabilities": []
+    }
+
+    for finding in result_raw["findings"]:
+        result["vulnerabilities"].append({
+            "id": f"BFLA-{result_raw['findings'].index(finding)+1:03d}",
+            "type": "BFLA",
+            "severity": "Critical" if finding["status"] == "VULNERABLE" else "Low",
+            "status": "취약" if finding["status"] == "VULNERABLE" else "양호",
+            "owasp": "A01:2021 - Broken Access Control",
+            "endpoint": finding["endpoint"],
+            "payload": "일반 사용자 토큰으로 관리자 API 접근 시도",
+            "detected_keywords": [],
+            "evidence": finding["reason"],
+            "description": f"관리자 전용 엔드포인트 {finding['endpoint']} 에 일반 사용자 접근 가능 — 권한 검증 없음"
+        })
+
+    return result
 
 if __name__ == "__main__":
     main()

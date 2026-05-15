@@ -5,6 +5,7 @@ from idor_check import idor_check
 from bola_check import bola_check
 from insecure_check import insecure_check
 from sqli_check import sqli_check
+from bfla_admin_check import bfla_check
 from datetime import datetime
 
 def run_scan(base_url):
@@ -21,6 +22,7 @@ def run_scan(base_url):
     results["modules"].append(idor_check(base_url))
     results["modules"].append(bola_check(base_url))
     results["modules"].append(sqli_check(base_url))
+    results["modules"].append(bfla_check(base_url))
 
     print("\n[*] 전체 스캔 완료")
     return results
