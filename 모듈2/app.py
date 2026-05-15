@@ -58,8 +58,8 @@ div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
 /* ── 배지/태그 ── */
 .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: .73rem; font-weight: 700; white-space: nowrap; line-height: 1.6; }
 .tag-CRITICAL { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-.tag-HIGH     { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
-.tag-MEDIUM   { background: #fefce8; color: #ca8a04; border: 1px solid #fef08a; }
+.tag-HIGH     { background: #fefce8; color: #a16207; border: 1px solid #fde047; }
+.tag-MEDIUM   { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
 .tag-LOW      { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
 .tag-INFO     { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
 .tag-VULN     { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
@@ -120,9 +120,15 @@ div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
 
 /* ── 인풋/셀렉트박스 ── */
 .stTextInput > div > div > input {
-    border: 1px solid #dde1e7 !important; border-radius: 8px !important;
-    background: white !important; font-size: .88rem !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
+    border: 1px solid #dde1e7 !important; border-radius: 10px !important;
+    background: white !important; font-size: .92rem !important;
+    padding: 12px 16px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06) !important;
+    transition: border-color .15s, box-shadow .15s !important;
+}
+.stTextInput > div > div > input:focus {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important;
 }
 .stSelectbox > div > div { border: 1px solid #dde1e7 !important; border-radius: 8px !important; background: white !important; }
 
@@ -207,7 +213,7 @@ SCANNERS = load_scanners()
 # ══════════════════════════════════════════════════════════════
 SEV_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 SEV_KOR   = {"CRITICAL": "치명적", "HIGH": "높음", "MEDIUM": "중간", "LOW": "낮음", "INFO": "정보"}
-SEV_COLOR = {"CRITICAL": "#dc2626", "HIGH": "#ea580c", "MEDIUM": "#ca8a04", "LOW": "#16a34a", "INFO": "#2563eb"}
+SEV_COLOR = {"CRITICAL": "#dc2626", "HIGH": "#eab308", "MEDIUM": "#f97316", "LOW": "#16a34a", "INFO": "#2563eb"}
 
 def is_vuln(v: dict) -> bool:
     return "취약" in v.get("status", "")
@@ -270,27 +276,19 @@ for k, v in {
 
 
 # ══════════════════════════════════════════════════════════════
-# URL 입력 + 진단 시작
+# 스캔 실행 함수 (랜딩 / 대시보드 양쪽에서 공용)
 # ══════════════════════════════════════════════════════════════
-col_url, col_btn = st.columns([5, 1])
-with col_url:
-    url_input = st.text_input("URL", placeholder="예: http://52.79.242.217:3000", label_visibility="collapsed")
-with col_btn:
-    run_btn = st.button("▶ 진단 시작", use_container_width=True, type="primary")
-
-if run_btn:
-    if not url_input.strip():
-        st.error("❌ URL을 입력해 주세요."); st.stop()
+def execute_scan(url: str):
     if not OPENAI_API_KEY:
         st.error("❌ .env 파일에 OPENAI_API_KEY를 설정해 주세요."); st.stop()
 
-    st.session_state.target_url = url_input.strip()
+    st.session_state.target_url = url
     st.session_state.sel = None
     for k in [k for k in st.session_state if k.startswith("ai_")]:
         del st.session_state[k]
 
     with st.spinner("🔍 백엔드 API 자동 탐색 중..."):
-        backend = find_backend_url(url_input.strip())
+        backend = find_backend_url(url)
     st.session_state.backend_url = backend
 
     pb, st_txt = st.progress(0), st.empty()
@@ -314,28 +312,96 @@ if run_btn:
     st_txt.empty(); pb.empty()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), f"scan_result_{ts}.json"), "w", encoding="utf-8") as f:
-        json.dump({"target": url_input.strip(), "scan_time": ts, "scanner_results": raw_results}, f, ensure_ascii=False, indent=2)
+        json.dump({"target": url, "scan_time": ts, "scanner_results": raw_results}, f, ensure_ascii=False, indent=2)
 
-    st.session_state.all_vulns   = all_vulns
-    st.session_state.raw_results  = raw_results
-    st.session_state.scan_time    = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-    st.session_state.scan_done    = True
+    st.session_state.all_vulns  = all_vulns
+    st.session_state.raw_results = raw_results
+    st.session_state.scan_time   = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
+    st.session_state.scan_done   = True
     st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════
-# 대기 화면
+# 랜딩 페이지 (스캔 전)
 # ══════════════════════════════════════════════════════════════
 if not st.session_state.scan_done:
-    st.markdown("---")
-    st.info("👆 URL을 입력하고 **▶ 진단 시작** 버튼을 눌러주세요.")
-    if SCANNERS:
-        st.markdown("**로드된 스캐너:**")
-        cols = st.columns(len(SCANNERS))
-        for i, sc in enumerate(SCANNERS):
-            with cols[i]:
-                (st.success if sc.get("run") else st.error)(f"{'✅' if sc.get('run') else '❌'} {sc['label']}")
+
+    # 히어로
+    st.markdown("""
+    <div style="text-align:center;padding:64px 0 32px">
+        <div style="font-size:4rem;margin-bottom:18px">🔒</div>
+        <div style="font-size:2rem;font-weight:800;color:#1e293b;margin-bottom:8px">
+            보안 취약점 진단 시스템
+        </div>
+        <div style="font-size:.95rem;color:#94a3b8;letter-spacing:.03em">
+            Security Vulnerability Diagnosis System
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # URL 입력 (가운데 정렬)
+    _, mid, _ = st.columns([1, 3, 1])
+    with mid:
+        # 라벨
+        st.markdown('<p style="font-size:.83rem;font-weight:600;color:#64748b;margin:0 0 4px 2px">진단할 사이트 URL</p>', unsafe_allow_html=True)
+        # 입력창
+        landing_url = st.text_input(
+            "landing_url",
+            placeholder="예: http://52.79.242.217:3000",
+            label_visibility="collapsed",
+            key="landing_url_input"
+        )
+        # 버튼 — 가운데 정렬, 텍스트에 맞는 너비
+        st.markdown('<div style="margin-top:8px"></div>', unsafe_allow_html=True)
+        _, btn_col, _ = st.columns([1, 2, 1])
+        with btn_col:
+            landing_btn = st.button("▶ 진단 시작", use_container_width=True, type="primary", key="landing_btn")
+        if landing_btn:
+            if not landing_url.strip():
+                st.error("URL을 입력해 주세요.")
+            else:
+                execute_scan(landing_url.strip())
+
+        # 진단 항목 뱃지
+        st.markdown("<br>", unsafe_allow_html=True)
+        loaded = [s for s in SCANNERS if s.get("run")]
+        failed = [s for s in SCANNERS if not s.get("run")]
+        badge_html = "".join([
+            f'<span style="display:inline-block;background:#f8fafc;color:#64748b;'
+            f'border:1px solid #e2e8f0;border-radius:20px;padding:4px 14px;'
+            f'font-size:.8rem;margin:3px">{s["label"]}</span>'
+            for s in loaded
+        ]) + "".join([
+            f'<span style="display:inline-block;background:#fef2f2;color:#dc2626;'
+            f'border:1px solid #fecaca;border-radius:20px;padding:4px 14px;'
+            f'font-size:.8rem;margin:3px">{s["label"]} ✕</span>'
+            for s in failed
+        ])
+        st.markdown(f"""
+        <div style="text-align:center">
+            <div style="font-size:.72rem;color:#cbd5e1;margin-bottom:8px;text-transform:uppercase;
+                        letter-spacing:.06em;font-weight:600">지원 스캐너</div>
+            {badge_html}
+        </div>
+        """, unsafe_allow_html=True)
+
     st.stop()
+
+# ══════════════════════════════════════════════════════════════
+# 대시보드 상단 — URL 재입력 + 재진단
+# ══════════════════════════════════════════════════════════════
+col_url, col_btn = st.columns([5, 1])
+with col_url:
+    url_input = st.text_input("URL", placeholder="예: http://52.79.242.217:3000",
+                              label_visibility="collapsed", key="dashboard_url")
+with col_btn:
+    run_btn = st.button("▶ 재진단", use_container_width=True, type="primary", key="dashboard_btn")
+
+if run_btn:
+    if not url_input.strip():
+        st.error("❌ URL을 입력해 주세요.")
+    else:
+        execute_scan(url_input.strip())
 
 
 # ══════════════════════════════════════════════════════════════
@@ -369,21 +435,10 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Row 1: 상단 지표 카드 3개 ───────────────────────────────
-r1c1, r1c2, r1c3 = st.columns(3)
+# ── Row 1: 핵심 지표 + 위험도 분포 (2열) ────────────────────
+r1c1, r1c2 = st.columns(2)
 
 with r1c1:
-    st.markdown(f"""
-    <div class="card">
-      <div class="card-label">📊 종합 점수 및 등급</div>
-      <span class="score-num" style="color:{gcolor}">{score}</span>
-      <span class="score-deno"> / 100</span>
-      <br>
-      <span class="grade-chip" style="background:{gcolor}1a;color:{gcolor};">✅ {grade}</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-with r1c2:
     st.markdown(f"""
     <div class="card">
       <div class="card-label">📋 핵심 지표</div>
@@ -393,21 +448,21 @@ with r1c2:
     </div>
     """, unsafe_allow_html=True)
 
-with r1c3:
+with r1c2:
     st.markdown(f"""
     <div class="card">
       <div class="card-label">⚠️ 위험도 분포</div>
       <div class="dist-row"><span class="dot" style="background:#dc2626"></span>치명적 &nbsp;<b>{crit_c}</b></div>
-      <div class="dist-row"><span class="dot" style="background:#ea580c"></span>높음 &nbsp;<b>{high_c}</b></div>
-      <div class="dist-row"><span class="dot" style="background:#ca8a04"></span>중간 &nbsp;<b>{med_c}</b></div>
+      <div class="dist-row"><span class="dot" style="background:#eab308"></span>높음 &nbsp;<b>{high_c}</b></div>
+      <div class="dist-row"><span class="dot" style="background:#f97316"></span>중간 &nbsp;<b>{med_c}</b></div>
       <div class="dist-row"><span class="dot" style="background:#16a34a"></span>낮음 &nbsp;<b>{low_c}</b></div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ── Row 2: 차트 2개 + 상세 패널 ─────────────────────────────
-r2c1, r2c2, r2c3 = st.columns([2, 2, 2.2])
+# ── Row 2: 차트 2개 ──────────────────────────────────────────
+r2c1, r2c2 = st.columns(2)
 
 with r2c1:
     if HAS_PLOTLY and vuln_c > 0:
@@ -421,8 +476,8 @@ with r2c1:
         ))
         fig1.update_layout(
             title=dict(text="위험도 비율", x=0.5, font=dict(size=13, color="#374151")),
-            height=260, margin=dict(t=40, b=10, l=10, r=10),
-            legend=dict(orientation="v", x=1.0, y=0.5, font=dict(size=11)),
+            height=280, margin=dict(t=40, b=10, l=10, r=10),
+            showlegend=False,
             paper_bgcolor="white", plot_bgcolor="white",
             font=dict(family="-apple-system,sans-serif")
         )
@@ -452,9 +507,9 @@ with r2c2:
         ))
         fig2.update_layout(
             title=dict(text="카테고리별 취약점", x=0.5, font=dict(size=13, color="#374151")),
-            height=260, margin=dict(t=40, b=10, l=10, r=10),
+            height=280, margin=dict(t=40, b=10, l=20, r=20),
             yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False, showticklabels=False),
-            xaxis=dict(tickfont=dict(size=10)),
+            xaxis=dict(tickfont=dict(size=10), tickangle=0),
             paper_bgcolor="white", plot_bgcolor="white", showlegend=False,
             font=dict(family="-apple-system,sans-serif")
         )
@@ -466,19 +521,89 @@ with r2c2:
             <div style="color:#cbd5e1;font-size:.85rem;margin-top:8px">데이터 없음</div>
         </div>""", unsafe_allow_html=True)
 
-# ── 오른쪽: 상세 패널 (선택 항목 AI 분석) ──────────────────
-with r2c3:
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("---")
+
+# ══════════════════════════════════════════════════════════════
+# 테이블 (왼쪽) + 상세 패널 (오른쪽) 나란히
+# ══════════════════════════════════════════════════════════════
+tbl_col, det_col = st.columns([5, 4])
+
+# ── 왼쪽: 검색·필터 + 테이블 ────────────────────────────────
+with tbl_col:
+    # 검색 / 필터
+    flt1, flt2, flt3 = st.columns([2.4, 1.3, 1.3])
+    with flt1:
+        search = st.text_input("search", placeholder="🔍  항목 ID 또는 카테고리 검색", label_visibility="collapsed")
+    with flt2:
+        sev_opt = st.selectbox("위험도", ["위험도 (전체)","치명적","높음","중간","낮음"], label_visibility="collapsed")
+    with flt3:
+        sts_opt = st.selectbox("결과", ["결과 (전체)","취약","통과"], label_visibility="collapsed")
+
+    SEV_MAP_KOR = {"치명적":"CRITICAL","높음":"HIGH","중간":"MEDIUM","낮음":"LOW"}
+    filtered = sorted_vulns
+    if search:
+        q = search.lower()
+        filtered = [v for v in filtered if q in v.get("id","").lower() or q in v.get("_scanner","").lower()]
+    if sev_opt != "위험도 (전체)":
+        filtered = [v for v in filtered if v.get("severity","").upper() == SEV_MAP_KOR.get(sev_opt, sev_opt)]
+    if sts_opt != "결과 (전체)":
+        filtered = [v for v in filtered if is_vuln(v)] if sts_opt == "취약" else [v for v in filtered if not is_vuln(v)]
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 테이블 헤더
+    st.markdown('<div class="tbl-wrap">', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="tbl-head">
+      <span>순번</span><span>항목 ID</span><span>카테고리</span>
+      <span>위험도</span><span>진단 결과</span><span></span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if not filtered:
+        st.markdown('<div style="background:white;padding:24px;text-align:center;color:#94a3b8;font-size:.88rem">조건에 맞는 항목이 없습니다.</div>', unsafe_allow_html=True)
+    else:
+        for i, vuln in enumerate(filtered):
+            sev         = vuln.get("severity","").upper()
+            vuln_ok     = not is_vuln(vuln)
+            is_selected = (st.session_state.sel == i)
+            num_style   = "color:#2563eb;font-weight:700" if is_selected else "color:#9ca3af"
+            id_style    = "color:#2563eb;font-weight:700" if is_selected else "color:#1e293b;font-weight:600"
+            row_bg      = "background:#eff6ff;" if is_selected else "background:white;"
+
+            rc = st.columns([0.44, 1.58, 1.1, 0.9, 0.82, 0.44])
+            with rc[0]:
+                st.markdown(f'<div style="height:36px;display:flex;align-items:center;{num_style};font-size:.84rem;padding:0 4px;{row_bg}">{i+1}</div>', unsafe_allow_html=True)
+            with rc[1]:
+                st.markdown(f'<div style="height:36px;display:flex;align-items:center;{id_style};font-size:.84rem;{row_bg}">{vuln.get("id","?")}</div>', unsafe_allow_html=True)
+            with rc[2]:
+                st.markdown(f'<div style="height:36px;display:flex;align-items:center;font-size:.84rem;color:#374151;{row_bg}">{vuln.get("_scanner","?")}</div>', unsafe_allow_html=True)
+            with rc[3]:
+                st.markdown(f'<div style="height:36px;display:flex;align-items:center;{row_bg}">{sev_tag(sev)}</div>', unsafe_allow_html=True)
+            with rc[4]:
+                st.markdown(f'<div style="height:36px;display:flex;align-items:center;{row_bg}">{tag("OK","통과") if vuln_ok else tag("VULN","취약")}</div>', unsafe_allow_html=True)
+            with rc[5]:
+                btn_lbl = "◀" if is_selected else "▶"
+                if st.button(btn_lbl, key=f"row_{i}", use_container_width=True):
+                    st.session_state.sel = None if is_selected else i
+                    st.rerun()
+            st.markdown(f'<div style="height:1px;background:#f1f5f9"></div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── 오른쪽: 상세 패널 ────────────────────────────────────────
+with det_col:
     sel = st.session_state.sel
-    # sel이 현재 sorted_vulns 범위 안에 있는지 확인 (필터 변경 대비)
     sel_vuln = sorted_vulns[sel] if (sel is not None and 0 <= sel < len(sorted_vulns)) else None
 
     if sel_vuln is None:
         st.markdown("""
-        <div class="detail-panel">
+        <div class="detail-panel" style="min-height:300px">
           <div class="placeholder">
-            <div style="font-size:2rem">📋</div>
-            <div style="margin-top:10px;font-size:.87rem;text-align:center">
-              아래 목록에서 항목을 선택하면<br>AI 상세 분석이 표시됩니다.
+            <div style="font-size:2.2rem">📋</div>
+            <div style="margin-top:12px;font-size:.87rem;text-align:center;line-height:1.7">
+              왼쪽 목록에서 항목을 선택하면<br>AI 상세 분석이 표시됩니다.
             </div>
           </div>
         </div>
@@ -490,22 +615,21 @@ with r2c3:
 
         st.markdown(f"""
         <div class="detail-panel">
-          <div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid #f1f5f9;padding-bottom:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid #f1f5f9;padding-bottom:12px;margin-bottom:12px;flex-wrap:wrap">
             <span class="detail-id">{vuln_id} 상세 정보</span>
             {sev_tag(sev)}
             {tag("VULN","취약") if is_vuln(vuln) else tag("OK","통과")}
-            <span style="margin-left:auto;font-size:.75rem;cursor:pointer;color:#94a3b8">∧</span>
           </div>
           <div class="detail-meta">
             <b>엔드포인트:</b> {vuln.get('endpoint','N/A')}<br>
             <b>OWASP:</b> {vuln.get('owasp','N/A')}<br>
-            <b>페이로드:</b> {str(vuln.get('payload','N/A'))[:100]}<br>
+            <b>페이로드:</b> {str(vuln.get('payload','N/A'))[:120]}<br>
             <b>탐지 키워드:</b> {', '.join(vuln.get('detected_keywords',[])) or '없음'}
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # AI 분석 (캐시)
+        # AI 분석 (온디맨드 + 캐시)
         cache_key = f"ai_{vuln_id}_{vuln.get('_scanner','')}"
         if cache_key not in st.session_state:
             if not OPENAI_API_KEY:
@@ -524,7 +648,7 @@ with r2c3:
         if cache_key in st.session_state:
             a = st.session_state[cache_key]
             st.markdown(f"""
-            <div style="margin-top:6px">
+            <div style="margin-top:8px">
               <div class="detail-section">
                 <div class="detail-section-title">🔍 발견된 문제점 (Findings)</div>
                 <div class="finding-box">{a.get('description','')}</div>
@@ -539,90 +663,6 @@ with r2c3:
               </div>
             </div>
             """, unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("---")
-
-# ══════════════════════════════════════════════════════════════
-# 검색 / 필터
-# ══════════════════════════════════════════════════════════════
-flt1, flt2, flt3 = st.columns([2.5, 1.2, 1.2])
-with flt1:
-    search = st.text_input("search", placeholder="🔍  항목 ID 또는 카테고리 검색", label_visibility="collapsed")
-with flt2:
-    sev_opt = st.selectbox("위험도", ["필터: 위험도 (전체)","치명적","높음","중간","낮음"], label_visibility="collapsed")
-with flt3:
-    sts_opt = st.selectbox("결과", ["필터: 결과 (전체)","취약","통과"], label_visibility="collapsed")
-
-SEV_MAP_KOR = {"치명적":"CRITICAL","높음":"HIGH","중간":"MEDIUM","낮음":"LOW"}
-filtered = sorted_vulns
-if search:
-    q = search.lower()
-    filtered = [v for v in filtered if q in v.get("id","").lower() or q in v.get("_scanner","").lower()]
-if sev_opt != "필터: 위험도 (전체)":
-    filtered = [v for v in filtered if v.get("severity","").upper() == SEV_MAP_KOR.get(sev_opt, sev_opt)]
-if sts_opt != "필터: 결과 (전체)":
-    filtered = [v for v in filtered if is_vuln(v)] if sts_opt == "취약" else [v for v in filtered if not is_vuln(v)]
-
-
-# ══════════════════════════════════════════════════════════════
-# 테이블
-# ══════════════════════════════════════════════════════════════
-st.markdown('<div class="tbl-wrap">', unsafe_allow_html=True)
-
-# 헤더 행
-st.markdown("""
-<div class="tbl-head">
-  <span>순번</span><span>항목 ID</span><span>카테고리</span>
-  <span>위험도</span><span>진단 결과</span><span></span>
-</div>
-""", unsafe_allow_html=True)
-
-if not filtered:
-    st.markdown('<div style="background:white;padding:24px;text-align:center;color:#94a3b8;font-size:.88rem">조건에 맞는 항목이 없습니다.</div>', unsafe_allow_html=True)
-else:
-    for i, vuln in enumerate(filtered):
-        sev          = vuln.get("severity","").upper()
-        vuln_ok      = not is_vuln(vuln)
-        is_selected  = (st.session_state.sel == i)
-        sel_cls      = "sel" if is_selected else ""
-        num_style    = "color:#2563eb;font-weight:700" if is_selected else "color:#9ca3af"
-        id_style     = "color:#2563eb;font-weight:700" if is_selected else "color:#1e293b;font-weight:600"
-
-        # 행 HTML (버튼 칸만 비워둠 — Streamlit 버튼으로 대체)
-        row_html = f"""
-        <div class="trow {sel_cls}">
-          <div class="cell" style="{num_style}">{i+1}</div>
-          <div class="cell" style="{id_style}">{vuln.get('id','?')}</div>
-          <div class="cell" style="color:#374151">{vuln.get('_scanner','?')}</div>
-          <div class="cell">{sev_tag(sev)}</div>
-          <div class="cell">{tag("OK","통과") if vuln_ok else tag("VULN","취약")}</div>
-          <div class="cell"></div>
-        </div>
-        """
-        # Streamlit 컬럼으로 HTML + 버튼 배치
-        rc = st.columns([0.44, 1.58, 1.0, 0.9, 0.82, 0.44])
-        with rc[0]:
-            st.markdown(f'<div style="height:34px;display:flex;align-items:center;{num_style};font-size:.84rem">{i+1}</div>', unsafe_allow_html=True)
-        with rc[1]:
-            st.markdown(f'<div style="height:34px;display:flex;align-items:center;{id_style};font-size:.84rem">{vuln.get("id","?")}</div>', unsafe_allow_html=True)
-        with rc[2]:
-            st.markdown(f'<div style="height:34px;display:flex;align-items:center;font-size:.84rem;color:#374151">{vuln.get("_scanner","?")}</div>', unsafe_allow_html=True)
-        with rc[3]:
-            st.markdown(f'<div style="height:34px;display:flex;align-items:center">{sev_tag(sev)}</div>', unsafe_allow_html=True)
-        with rc[4]:
-            status_tag = tag("OK","통과") if vuln_ok else tag("VULN","취약")
-            st.markdown(f'<div style="height:34px;display:flex;align-items:center">{status_tag}</div>', unsafe_allow_html=True)
-        with rc[5]:
-            btn_lbl = "▲" if is_selected else "▽"
-            if st.button(btn_lbl, key=f"row_{i}", use_container_width=True):
-                st.session_state.sel = None if is_selected else i
-                st.rerun()
-
-        # 구분선
-        st.markdown('<div style="height:1px;background:#f1f5f9;margin:0"></div>', unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
 # 디버그 (원본 JSON)
