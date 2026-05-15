@@ -1,16 +1,9 @@
 {
-    "target_url": "http://52.79.242.217:3000/login",
+    "target_url": "http://52.79.242.217:8000",
     "timeout": 5,
-    "selectors": {
-        "id_field": "username",
-        "pw_field": "password",
-        "otp_field": "alert-error",
-        "login_button": "btn-lg",
-        "alert_msg": "error_message_box"
-    },
     "test_account": {
-        "id": "admin",
-        "pw": "password123"
+        "id": "alice",
+        "pw": "alice1234"
     },
 
     "wrong_account" : {
