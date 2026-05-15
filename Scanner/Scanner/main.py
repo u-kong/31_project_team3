@@ -7,6 +7,7 @@ from insecure_check import insecure_check
 from sqli_check import sqli_check
 from bfla_admin_check import bfla_check
 from datetime import datetime
+from jwt_check import jwt_check
 
 def run_scan(base_url):
     print(f"\n[*] 루키즈은행 취약점 진단 시작")
@@ -23,6 +24,7 @@ def run_scan(base_url):
     results["modules"].append(bola_check(base_url))
     results["modules"].append(sqli_check(base_url))
     results["modules"].append(bfla_check(base_url))
+    results["modules"].append(jwt_check(base_url))
 
     print("\n[*] 전체 스캔 완료")
     return results
