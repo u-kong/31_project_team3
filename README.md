@@ -151,3 +151,12 @@ streamlit run app.py
 ## 👥 팀 정보
 
 **31기 프로젝트 Team 3**
+
+| 이름 | 역할 | GitHub |
+|------|------|--------|
+| 태유빈 | 팀장/플랫폼 구축 | [@u-kong](https://github.com/u-kong) |
+| 김건하 | 진단 코드 작성 | [@geonha0507](https://github.com/geonha0507) |
+| 김라희 | 진단 코드 작성 | [@La-hee](https://github.com/La-hee) |
+| 김정현 | 진단 코드 작성 | [@junghyun1225](https://github.com/junghyun1225) |
+| 서범창 | 취약 사이트 제작 | [@west-window](https://github.com/west-window) |
+| 유인기 | 플랫폼 구축 | [@navytuna687](https://github.com/navytuna687) |
