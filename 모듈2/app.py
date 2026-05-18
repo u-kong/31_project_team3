@@ -241,17 +241,30 @@ def get_grade(s: int):
 # OpenAI AI 분석 (온디맨드 + 캐시)
 # ══════════════════════════════════════════════════════════════
 def analyze(client: openai.OpenAI, vuln: dict) -> dict:
-    desc = vuln.get("attack_method", vuln.get("description", "?"))
-    kw   = vuln.get("detected_keywords", [])
-    ev   = str(vuln.get("evidence", "없음"))[:300]
-    prompt = f"""보안 전문가로서 아래 침투 테스트 결과를 한국어로 분석하고 JSON만 출력하세요.
+    desc   = vuln.get("attack_method", vuln.get("description", "?"))
+    kw     = vuln.get("detected_keywords", [])
+    ev     = str(vuln.get("evidence", "없음"))[:300]
+    status = vuln.get("status", "")
+
+    if "취약" in status:
+        prompt = f"""보안 전문가로서 아래 침투 테스트 결과를 한국어로 분석하고 JSON만 출력하세요.
 
 취약점: {vuln.get('name', vuln.get('type','?'))} | 심각도: {vuln.get('severity')} | OWASP: {vuln.get('owasp','')}
 엔드포인트: {vuln.get('endpoint')} | 설명: {desc}
-페이로드: {vuln.get('payload','없음')} | 상태: {vuln.get('result', vuln.get('status'))}
+페이로드: {vuln.get('payload','없음')} | 상태: {status}
 탐지 키워드: {', '.join(kw) if kw else '없음'} | 증거: {ev}
 
-{{"description":"기술적 설명 (2~3문장)","scenario":"공격자 악용 시나리오 (단계별로)","countermeasure":"개발자 대응방안 (간결하게)"}}"""
+{{"description":"취약점 기술적 설명 (2~3문장)","scenario":"공격자 악용 시나리오 (단계별로)","countermeasure":"개발자 대응방안 (간결하게)"}}"""
+    else:
+        prompt = f"""보안 전문가로서 아래 보안 점검 결과를 한국어로 분석하고 JSON만 출력하세요.
+
+항목: {vuln.get('name', vuln.get('type','?'))} | 심각도: {vuln.get('severity')} | OWASP: {vuln.get('owasp','')}
+엔드포인트: {vuln.get('endpoint')} | 설명: {desc} | 증거: {ev}
+
+이 항목은 진단 결과 양호(통과) 판정을 받았습니다.
+
+{{"description":"패치된 내용과 보안 효과 설명 (2~3문장)","scenario":"패치 전 공격자가 악용할 수 있었던 시나리오 (과거형으로)","countermeasure":"적용된 보안 조치 요약 (간결하게)"}}"""
+
     r   = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
@@ -423,41 +436,67 @@ low_c   = sum(1 for v in sorted_vulns if v.get("severity","").upper()=="LOW"    
 score   = calc_score(sorted_vulns)
 grade, gcolor = get_grade(score)
 
-# ── 보고서 헤더 ─────────────────────────────────────────────
+# ── 스캐너별 심각도 분포 사전 계산 ────────────────────────────
+sc_sev = {}
+for v in sorted_vulns:
+    if is_vuln(v):
+        sc_name = v.get("_scanner", "기타")
+        sev_key = v.get("severity", "").upper()
+        if sc_name not in sc_sev:
+            sc_sev[sc_name] = {}
+        sc_sev[sc_name][sev_key] = sc_sev[sc_name].get(sev_key, 0) + 1
+
+rows_html = ""
+for sc_name in sorted(sc_sev.keys()):
+    sevs = sc_sev[sc_name]
+    parts = []
+    for sk in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+        cnt = sevs.get(sk, 0)
+        if cnt:
+            parts.append(
+                f'<span style="color:{SEV_COLOR[sk]};font-size:.78rem;white-space:nowrap">'
+                f'● {SEV_KOR[sk]} {cnt}</span>'
+            )
+    rows_html += (
+        f'<div class="kv" style="align-items:center">'
+        f'<span style="font-size:.82rem;font-weight:600;color:#374151;min-width:80px">{sc_name}</span>'
+        f'<span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">{"".join(parts)}</span>'
+        f'</div>'
+    )
+
+# ── 상단 전체: CSS 그리드로 높이 정확히 맞춤 ────────────────────
 st.markdown(f"""
-<div class="report-hdr">
-  <h3>🔒 보안 취약점 진단 보고서 <span style="font-size:.85rem;font-weight:400;color:#64748b">(Security Vulnerability Diagnosis Report)</span></h3>
-  <small>
-    진단 대상: <b>{st.session_state.target_url}</b> &nbsp;|&nbsp;
-    백엔드 API: <b>{st.session_state.backend_url}</b> &nbsp;|&nbsp;
-    진단 일시: <b>{st.session_state.scan_time}</b>
-  </small>
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px">
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="report-hdr" style="margin-bottom:0">
+      <h3>🔒 보안 취약점 진단 보고서 <span style="font-size:.85rem;font-weight:400;color:#64748b">(Security Vulnerability Diagnosis Report)</span></h3>
+      <small>진단 대상: <b>{st.session_state.target_url}</b> &nbsp;|&nbsp; 백엔드 API: <b>{st.session_state.backend_url}</b> &nbsp;|&nbsp; 진단 일시: <b>{st.session_state.scan_time}</b></small>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1">
+      <div class="card">
+        <div class="card-label">📋 핵심 지표</div>
+        <div class="kv"><span>총 진단 항목</span><b>{total_c}</b></div>
+        <div class="kv"><span>통과</span><b style="color:#16a34a">{pass_c}</b></div>
+        <div class="kv"><span>취약</span><b style="color:#dc2626">{vuln_c}</b></div>
+      </div>
+      <div class="card">
+        <div class="card-label">⚠️ 위험도 분포</div>
+        <div class="dist-row"><span class="dot" style="background:#dc2626"></span>치명적 &nbsp;<b>{crit_c}</b></div>
+        <div class="dist-row"><span class="dot" style="background:#eab308"></span>높음 &nbsp;<b>{high_c}</b></div>
+        <div class="dist-row"><span class="dot" style="background:#f97316"></span>중간 &nbsp;<b>{med_c}</b></div>
+        <div class="dist-row"><span class="dot" style="background:#16a34a"></span>낮음 &nbsp;<b>{low_c}</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">📂 스캐너별 취약점 현황</div>
+    {rows_html if rows_html else '<div style="color:#cbd5e1;font-size:.85rem">취약 항목 없음</div>'}
+  </div>
+
 </div>
 """, unsafe_allow_html=True)
-
-# ── Row 1: 핵심 지표 + 위험도 분포 (2열) ────────────────────
-r1c1, r1c2 = st.columns(2)
-
-with r1c1:
-    st.markdown(f"""
-    <div class="card">
-      <div class="card-label">📋 핵심 지표</div>
-      <div class="kv"><span>총 진단 항목</span><b>{total_c}</b></div>
-      <div class="kv"><span>통과</span><b style="color:#16a34a">{pass_c}</b></div>
-      <div class="kv"><span>취약</span><b style="color:#dc2626">{vuln_c}</b></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with r1c2:
-    st.markdown(f"""
-    <div class="card">
-      <div class="card-label">⚠️ 위험도 분포</div>
-      <div class="dist-row"><span class="dot" style="background:#dc2626"></span>치명적 &nbsp;<b>{crit_c}</b></div>
-      <div class="dist-row"><span class="dot" style="background:#eab308"></span>높음 &nbsp;<b>{high_c}</b></div>
-      <div class="dist-row"><span class="dot" style="background:#f97316"></span>중간 &nbsp;<b>{med_c}</b></div>
-      <div class="dist-row"><span class="dot" style="background:#16a34a"></span>낮음 &nbsp;<b>{low_c}</b></div>
-    </div>
-    """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -491,17 +530,16 @@ with r2c1:
 
 with r2c2:
     if HAS_PLOTLY and vuln_c > 0:
-        cats, cat_worst = {}, {}
+        cats = {}
         for v in sorted_vulns:
             if is_vuln(v):
                 c = v.get("_scanner", "기타")
                 cats[c] = cats.get(c, 0) + 1
-                cat_worst[c] = min(cat_worst.get(c, 9), SEV_ORDER.get(v.get("severity","").upper(), 9))
-        r2k = {0:"CRITICAL",1:"HIGH",2:"MEDIUM",3:"LOW",4:"INFO"}
-        bar_colors = [SEV_COLOR.get(r2k.get(cat_worst.get(c,4),"INFO"),"#2563eb") for c in cats]
         fig2 = go.Figure(go.Bar(
             x=list(cats.keys()), y=list(cats.values()),
-            marker_color=bar_colors, text=list(cats.values()),
+            marker_color="#3b82f6",
+            marker_line_color="#2563eb", marker_line_width=0,
+            text=list(cats.values()),
             textposition="outside",
             hovertemplate="%{x}: %{y}건<extra></extra>"
         ))
@@ -595,7 +633,7 @@ with tbl_col:
 # ── 오른쪽: 상세 패널 ────────────────────────────────────────
 with det_col:
     sel = st.session_state.sel
-    sel_vuln = sorted_vulns[sel] if (sel is not None and 0 <= sel < len(sorted_vulns)) else None
+    sel_vuln = filtered[sel] if (sel is not None and 0 <= sel < len(filtered)) else None
 
     if sel_vuln is None:
         st.markdown("""
